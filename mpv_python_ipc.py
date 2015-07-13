@@ -42,11 +42,11 @@ class MpvProcess(object):
         t.start()
 
     def _escape_script_binding(self, text):
-        allowed_chars = list(chain(*[
+        allowed_chars = list(chain(
             range(48, 58), # 0-9
             range(65, 91), # A-Z
             range(97, 123), # a-z
-        ]))
+        ))
         return ''.join('{{c{}}}'.format(ord(c)) if (ord(c) not in allowed_chars) else c for c in text)
 
     def slave_command(self, command):

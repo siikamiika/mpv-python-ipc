@@ -24,6 +24,7 @@ end
 function get_property(req_id, property, native)
     local gp = mp.get_property
     if native then gp = mp.get_property_native end
+    local property = unescape(property)
     local val = utils.format_json({req_id, gp(property)})
     print(val)
 end
