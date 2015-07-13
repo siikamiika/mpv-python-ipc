@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import os
 from os.path import dirname, realpath
+from itertools import chain
 mpv_executable = 'mpv'
 if os.name == 'nt':
     mpv_executable += '.com'
@@ -41,10 +42,12 @@ class MpvProcess(object):
         t.start()
 
     def _escape_script_binding(self, text):
-        chars = ['/', ' ', '_']
-        for c in chars:
-            text = text.replace(c, '{{c{}}}'.format(ord(c)))
-        return text
+        allowed_chars = list(chain(*[
+            range(48, 58), # 0-9
+            range(65, 91), # A-Z
+            range(97, 123), # a-z
+        ]))
+        return ''.join('{{c{}}}'.format(ord(c)) if (ord(c) not in allowed_chars) else c for c in text)
 
     def slave_command(self, command):
         self.process.stdin.write((command + '\n').encode('utf-8'))
@@ -60,7 +63,7 @@ class MpvProcess(object):
 
     def set_property(self, prop, value):
         prop = self._escape_script_binding(prop)
-        value = self._escape_script_binding(value)
+        value = self._escape_script_binding(json.dumps(value))
         return self._ipc_command('setproperty_{}_{}'.format(
             prop, value))
 

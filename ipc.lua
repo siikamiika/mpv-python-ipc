@@ -21,20 +21,20 @@ function unescape(input)
     return input:gsub("{c(%d+)}", function (charcode) return string.char(tonumber(charcode)) end)
 end
 
-function get_property(req_id, property)
-    local val = utils.format_json({req_id, mp.get_property(property)})
+function get_property(req_id, property, native)
+    local gp = mp.get_property
+    if native then gp = mp.get_property_native end
+    local val = utils.format_json({req_id, gp(property)})
     print(val)
 end
 
 function get_property_native(req_id, property)
-    local val = utils.format_json({req_id, mp.get_property_native(property)})
-    print(val)
+    get_property(req_id, property, true)
 end
 
 function set_property(req_id, property, value)
     local property = unescape(property)
-    local value = unescape(value)
-    print(property, value)
+    local value = utils.parse_json(unescape(value))
     mp.set_property(property, value)
     local response = utils.format_json({req_id})
     print(response)
