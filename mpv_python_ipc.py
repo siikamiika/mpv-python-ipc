@@ -13,9 +13,6 @@ if os.name == 'nt':
 
 script_path = Path(dirname(realpath(__file__)))
 
-def escape(val):
-    return val.replace('\\', '\\\\').replace('"', '\\"')
-
 class MpvProcess(object):
 
     def __init__(self, debug=False):
@@ -43,11 +40,18 @@ class MpvProcess(object):
         t.daemon = True
         t.start()
 
+    def _escape_script_binding(self, text):
+        chars = ['/', ' ', '_']
+        for c in chars:
+            text = text.replace(c, '{{c{}}}'.format(ord(c)))
+        return text
+
     def slave_command(self, command):
         self.process.stdin.write((command + '\n').encode('utf-8'))
         self.process.stdin.flush()
 
     def get_property(self, prop, native=False):
+        prop = self._escape_script_binding(prop)
         return self._ipc_command('getproperty{}_{}'.format(
             'native' if native else '', prop))
 
@@ -55,6 +59,8 @@ class MpvProcess(object):
         return self.get_property(prop, True)
 
     def set_property(self, prop, value):
+        prop = self._escape_script_binding(prop)
+        value = self._escape_script_binding(value)
         return self._ipc_command('setproperty_{}_{}'.format(
             prop, value))
 
@@ -73,7 +79,9 @@ class MpvProcess(object):
 
             if output.startswith("[ipc]"):
                 output = output.lstrip("[ipc]").strip()
-                output = json.loads(output)
+                try:
+                    output = json.loads(output)
+                except: continue
                 if output[0] == self.command_id:
                     self.command_id += 1
                     return output[1] if output[1:] else None

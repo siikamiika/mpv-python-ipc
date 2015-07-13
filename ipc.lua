@@ -17,6 +17,10 @@ function string.split(str, delim, maxsplit)
     return result
 end
 
+function unescape(input)
+    return input:gsub("{c(%d+)}", function (charcode) return string.char(tonumber(charcode)) end)
+end
+
 function get_property(req_id, property)
     local val = utils.format_json({req_id, mp.get_property(property)})
     print(val)
@@ -28,6 +32,9 @@ function get_property_native(req_id, property)
 end
 
 function set_property(req_id, property, value)
+    local property = unescape(property)
+    local value = unescape(value)
+    print(property, value)
     mp.set_property(property, value)
     local response = utils.format_json({req_id})
     print(response)
