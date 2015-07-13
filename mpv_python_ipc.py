@@ -51,6 +51,9 @@ class MpvProcess(object):
         return self._ipc_command('getproperty{}_{}'.format(
             'native' if native else '', prop))
 
+    def get_property_native(self, prop):
+        return self.get_property(prop, True)
+
     def set_property(self, prop, value):
         return self._ipc_command('setproperty_{}_{}'.format(
             prop, value))
