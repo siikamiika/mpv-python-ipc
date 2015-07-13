@@ -18,7 +18,8 @@ def escape(val):
 
 class MpvProcess(object):
 
-    def __init__(self):
+    def __init__(self, debug=False):
+        self.debug = debug
         self.process = Popen([mpv_executable,
             '--quiet',
             '--no-term-osd',
@@ -26,6 +27,7 @@ class MpvProcess(object):
             '--input-file=/dev/stdin',
             '--script={}'.format(script_path / 'ipc.lua'),
             '--force-window',
+            '--osc=no',
             '--idle'],
             stdout=PIPE, stdin=PIPE, bufsize=1)
         self._init_process()
@@ -61,7 +63,8 @@ class MpvProcess(object):
         while True:
             try:
                 output = self.queue.get(True, 3).decode()
-                sys.stdout.write(output)
+                if self.debug:
+                    sys.stdout.write(output)
             except Empty:
                 break
 
