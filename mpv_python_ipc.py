@@ -14,6 +14,24 @@ if os.name == 'nt':
 
 script_path = Path(dirname(realpath(__file__)))
 
+class MpvStdoutLine(object):
+
+    def __init__(self, raw_line):
+        self.raw_line = raw_line
+        self.ipc = False
+        self.parse_line()
+
+    def parse_line(self):
+        try:
+            line = self.raw_line.decode()
+            if line.startswith("[ipc]"):
+                line = json.loads(line.lstrip("[ipc]").strip())
+                self.id = line[0]
+                self.data = line[1] if line[1:] else None
+                self.ipc = True
+        except: pass
+
+
 class MpvProcess(object):
 
     def __init__(self, debug=False):
@@ -30,14 +48,18 @@ class MpvProcess(object):
             stdout=PIPE, stdin=PIPE, bufsize=1)
         self._init_process()
         self.command_id = 0
+        self.data_queues = dict()
 
     def _init_process(self):
-        def enqueue_output(out, queue):
+        def enqueue_output(out):
             for line in iter(out.readline, b''):
-                queue.put(line)
+                parsed_line = MpvStdoutLine(line)
+                if parsed_line.ipc and self.data_queues.get(parsed_line.id):
+                    self.data_queues[parsed_line.id].put(parsed_line.data)
+                if self.debug:
+                    print(line)
             out.close()
-        self.queue = Queue()
-        t = Thread(target=enqueue_output, args=(self.process.stdout, self.queue))
+        t = Thread(target=enqueue_output, args=(self.process.stdout,))
         t.daemon = True
         t.start()
 
@@ -68,23 +90,17 @@ class MpvProcess(object):
             prop, value))
 
     def _ipc_command(self, command):
+        c_id = self.command_id
+        self.command_id += 1
+        self.data_queues[c_id] = Queue()
         self.process.stdin.write(
             'script_binding {}\n'.format(
-                '{}_{}'.format(self.command_id, command)).encode('utf-8'))
+                '{}_{}'.format(c_id, command)).encode('utf-8'))
         self.process.stdin.flush()
-        while True:
-            try:
-                output = self.queue.get(True, 3).decode()
-                if self.debug:
-                    sys.stdout.write(output)
-            except Empty:
-                break
-
-            if output.startswith("[ipc]"):
-                output = output.lstrip("[ipc]").strip()
-                try:
-                    output = json.loads(output)
-                except: continue
-                if output[0] == self.command_id:
-                    self.command_id += 1
-                    return output[1] if output[1:] else None
+        try:
+            output = self.data_queues[c_id].get(True, 3)
+        except Empty:
+            output = None
+        finally:
+            del self.data_queues[c_id]
+        return output
