@@ -96,6 +96,7 @@ class MpvProcess(object):
             prop, value))
 
     def register_event(self, event_name, cb, observe_property=False):
+        self.unregister_event(event_name, observe_property)
         c_id = self.command_id
         def handle_events(_queue, _cb):
             while True:
@@ -105,7 +106,8 @@ class MpvProcess(object):
                         break
                     if observe_property:
                         try:
-                            _cb(*event)
+                            if event:
+                                _cb(*event)
                         except Exception as e:
                             print(e)
                     else:
@@ -123,12 +125,15 @@ class MpvProcess(object):
         self.event_listeners[event_name] = (t, c_id)
 
     def unregister_event(self, event_name, unobserve_property=False):
+        if not self.event_listeners.get(event_name):
+            return
         t, c_id = self.event_listeners[event_name]
-        self.data_queues[c_id].put('unregister')
+        queue = self.data_queues[c_id]
         self._ipc_command('{}_{}'.format(
                 'unobserveproperty' if unobserve_property else 'unregisterevent',
                 event_name
             ), custom_id=c_id)
+        queue.put('unregister')
         t.join()
         del self.event_listeners[event_name]
 
