@@ -27,7 +27,12 @@ class MpvStdoutLine(object):
             if line.startswith("[ipc]"):
                 line = json.loads(line.lstrip("[ipc]").strip())
                 self.id = line[0]
-                self.data = line[1] if line[1:] else None
+                if len(line) == 1:
+                    self.data = None
+                elif len(line) == 2:
+                    self.data = line[1]
+                else:
+                    self.data = line[1:]
                 self.ipc = True
         except: pass
 
@@ -90,7 +95,7 @@ class MpvProcess(object):
         return self._ipc_command('setproperty_{}_{}'.format(
             prop, value))
 
-    def register_event(self, event_name, cb):
+    def register_event(self, event_name, cb, observe_property=False):
         c_id = self.command_id
         def handle_events(_queue, _cb):
             while True:
@@ -98,22 +103,40 @@ class MpvProcess(object):
                     event = _queue.get(True)
                     if event == 'unregister':
                         break
-                    _cb()
+                    if observe_property:
+                        try:
+                            _cb(*event)
+                        except Exception as e:
+                            print(e)
+                    else:
+                        _cb()
                 except Empty:
                     pass
-        self._ipc_command('registerevent_{}'.format(event_name), keep_queue=True)
+        self._ipc_command('{}_{}'.format(
+                'observeproperty' if observe_property else 'registerevent',
+                event_name
+            ), keep_queue=True)
         queue = self.data_queues[c_id]
         t = Thread(target=handle_events, args=(queue, cb))
         t.daemon = True
         t.start()
         self.event_listeners[event_name] = (t, c_id)
 
-    def unregister_event(self, event_name):
+    def unregister_event(self, event_name, unobserve_property=False):
         t, c_id = self.event_listeners[event_name]
         self.data_queues[c_id].put('unregister')
-        self._ipc_command('unregisterevent_{}'.format(event_name), custom_id=c_id)
+        self._ipc_command('{}_{}'.format(
+                'unobserveproperty' if unobserve_property else 'unregisterevent',
+                event_name
+            ), custom_id=c_id)
         t.join()
         del self.event_listeners[event_name]
+
+    def observe_property(self, property_name, cb):
+        self.register_event(property_name, cb, True)
+
+    def unobserve_property(self, property_name):
+        self.unregister_event(property_name, True)
 
     def _ipc_command(self, command, custom_id=None, keep_queue=False):
         if custom_id == None:

@@ -1,6 +1,7 @@
 local utils = require "mp.utils"
 
 local registered_events = {}
+local observed_properties = {}
 
 function string.split(str, delim, maxsplit)
     local result = {}
@@ -59,6 +60,22 @@ function unregister_event(req_id, event_name)
     print(response)
 end
 
+function observe_property(req_id, property)
+    observed_properties[property] = function(name, value)
+        local event_notification = utils.format_json({req_id, name, value})
+        print(event_notification)
+    end
+    mp.observe_property(property, "native", observed_properties[property])
+    response = utils.format_json({req_id})
+    print(response)
+end
+
+function unobserve_property(req_id, property)
+    mp.unobserve_property(observed_properties[property])
+    response = utils.format_json({req_id})
+    print(response)
+end
+
 mp.register_event("client-message", function(e)
     local msg = e.args[2]
     msg = msg:split("_")
@@ -73,5 +90,9 @@ mp.register_event("client-message", function(e)
         register_event(msg[1], msg[3])
     elseif msg[2] == 'unregisterevent' then
         unregister_event(msg[1], msg[3])
+    elseif msg[2] == 'observeproperty' then
+        observe_property(msg[1], msg[3])
+    elseif msg[2] == 'unobserveproperty' then
+        unobserve_property(msg[1], msg[3])
     end
 end)
