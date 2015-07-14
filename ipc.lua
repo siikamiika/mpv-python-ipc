@@ -1,5 +1,7 @@
 local utils = require "mp.utils"
 
+local registered_events = {}
+
 function string.split(str, delim, maxsplit)
     local result = {}
     local buffer = ""
@@ -41,6 +43,22 @@ function set_property(req_id, property, value)
     print(response)
 end
 
+function register_event(req_id, event_name)
+    registered_events[event_name] = function()
+        local event_notification = utils.format_json({req_id})
+        print(event_notification)
+    end
+    mp.register_event(event_name, registered_events[event_name])
+    response = utils.format_json({req_id})
+    print(response)
+end
+
+function unregister_event(req_id, event_name)
+    mp.unregister_event(registered_events[event_name])
+    response = utils.format_json({req_id})
+    print(response)
+end
+
 mp.register_event("client-message", function(e)
     local msg = e.args[2]
     msg = msg:split("_")
@@ -51,5 +69,9 @@ mp.register_event("client-message", function(e)
         get_property_native(msg[1], msg[3])
     elseif msg[2] == 'setproperty' then
         set_property(msg[1], msg[3], msg[4])
+    elseif msg[2] == 'registerevent' then
+        register_event(msg[1], msg[3])
+    elseif msg[2] == 'unregisterevent' then
+        unregister_event(msg[1], msg[3])
     end
 end)

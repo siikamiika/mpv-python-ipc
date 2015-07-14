@@ -49,6 +49,7 @@ class MpvProcess(object):
         self._init_process()
         self.command_id = 0
         self.data_queues = dict()
+        self.event_listeners = dict()
 
     def _init_process(self):
         def enqueue_output(out):
@@ -89,10 +90,38 @@ class MpvProcess(object):
         return self._ipc_command('setproperty_{}_{}'.format(
             prop, value))
 
-    def _ipc_command(self, command):
+    def register_event(self, event_name, cb):
         c_id = self.command_id
-        self.command_id += 1
-        self.data_queues[c_id] = Queue()
+        def handle_events(_queue, _cb):
+            while True:
+                try:
+                    event = _queue.get(True)
+                    if event == 'unregister':
+                        break
+                    _cb()
+                except Empty:
+                    pass
+        self._ipc_command('registerevent_{}'.format(event_name), keep_queue=True)
+        queue = self.data_queues[c_id]
+        t = Thread(target=handle_events, args=(queue, cb))
+        t.daemon = True
+        t.start()
+        self.event_listeners[event_name] = (t, c_id)
+
+    def unregister_event(self, event_name):
+        t, c_id = self.event_listeners[event_name]
+        self.data_queues[c_id].put('unregister')
+        self._ipc_command('unregisterevent_{}'.format(event_name), custom_id=c_id)
+        t.join()
+        del self.event_listeners[event_name]
+
+    def _ipc_command(self, command, custom_id=None, keep_queue=False):
+        if custom_id == None:
+            c_id = self.command_id
+            self.command_id += 1
+            self.data_queues[c_id] = Queue()
+        else:
+            c_id = custom_id
         self.process.stdin.write(
             'script_binding {}\n'.format(
                 '{}_{}'.format(c_id, command)).encode('utf-8'))
@@ -102,5 +131,6 @@ class MpvProcess(object):
         except Empty:
             output = None
         finally:
-            del self.data_queues[c_id]
+            if not keep_queue:
+                del self.data_queues[c_id]
         return output
