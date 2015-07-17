@@ -3,20 +3,21 @@ local utils = require "mp.utils"
 local registered_events = {}
 local observed_properties = {}
 
-function string.split(str, delim, maxsplit)
-    local result = {}
-    local buffer = ""
-    local splits = 0
-    for c in str:gmatch(".") do
-        if splits ~= maxsplit and c == delim then
-            table.insert(result, buffer)
-            buffer = ""
-            splits = splits + 1
-        else
-            buffer = buffer..c
-        end
+function string:split(delim, max_splits)
+    if max_splits == nil or max_splits < 1 then
+        max_splits = 0
     end
-    table.insert(result, buffer)
+    local result = {}
+    local pattern = "(.-)"..delim.."()"
+    local splits = 0
+    local last_pos = 1
+    for part, pos in self:gmatch(pattern) do
+        splits = splits + 1
+        result[splits] = part
+        last_pos = pos
+        if splits == max_splits then break end
+    end
+    result[splits + 1] = self:sub(last_pos)
     return result
 end
 
