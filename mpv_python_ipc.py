@@ -37,6 +37,48 @@ class MpvStdoutLine(object):
         except: pass
 
 
+class MpvEventHandler(object):
+
+    def __init__(self, queue, func, observe_property):
+        self.queue = queue
+        self.func = func
+        self.observe_property = observe_property
+
+    def start(self):
+        while True:
+            try:
+                event = self.queue.get(True)
+                if event == 'unregister':
+                    break
+                if self.observe_property:
+                    try:
+                        if event:
+                            self.func(*event)
+                    except Exception as e:
+                        print(e)
+                else:
+                    self.func()
+            except Empty:
+                pass
+
+
+class MpvStdoutParser(object):
+
+    def __init__(self, fd, queues, debug):
+        self.fd = fd
+        self.queues = queues
+        self.debug = debug
+
+    def start(self):
+        for line in iter(self.fd.readline, b''):
+            parsed_line = MpvStdoutLine(line)
+            if parsed_line.ipc and self.queues.get(parsed_line.id):
+                self.queues[parsed_line.id].put(parsed_line.data)
+            if self.debug:
+                print(line)
+        self.fd.close()
+
+
 class MpvProcess(object):
 
     def __init__(self, debug=False):
@@ -51,21 +93,14 @@ class MpvProcess(object):
             '--osc=no',
             '--idle'],
             stdout=PIPE, stdin=PIPE, bufsize=1)
-        self._init_process()
         self.command_id = 0
         self.data_queues = dict()
         self.event_listeners = dict()
+        self._start_parser()
 
-    def _init_process(self):
-        def enqueue_output(out):
-            for line in iter(out.readline, b''):
-                parsed_line = MpvStdoutLine(line)
-                if parsed_line.ipc and self.data_queues.get(parsed_line.id):
-                    self.data_queues[parsed_line.id].put(parsed_line.data)
-                if self.debug:
-                    print(line)
-            out.close()
-        t = Thread(target=enqueue_output, args=(self.process.stdout,))
+    def _start_parser(self):
+        parser = MpvStdoutParser(self.process.stdout, self.data_queues, self.debug)
+        t = Thread(target=parser.start)
         t.daemon = True
         t.start()
 
@@ -95,31 +130,16 @@ class MpvProcess(object):
         return self._ipc_command('setproperty_{}_{}'.format(
             prop, value))
 
-    def register_event(self, event_name, cb, observe_property=False):
+    def register_event(self, event_name, fn, observe_property=False):
         self.unregister_event(event_name, observe_property)
         c_id = self.command_id
-        def handle_events(_queue, _cb):
-            while True:
-                try:
-                    event = _queue.get(True)
-                    if event == 'unregister':
-                        break
-                    if observe_property:
-                        try:
-                            if event:
-                                _cb(*event)
-                        except Exception as e:
-                            print(e)
-                    else:
-                        _cb()
-                except Empty:
-                    pass
         self._ipc_command('{}_{}'.format(
                 'observeproperty' if observe_property else 'registerevent',
                 event_name
             ), keep_queue=True)
         queue = self.data_queues[c_id]
-        t = Thread(target=handle_events, args=(queue, cb))
+        event_handler = MpvEventHandler(queue, fn, observe_property)
+        t = Thread(target=event_handler.start)
         t.daemon = True
         t.start()
         self.event_listeners[event_name] = (t, c_id)
@@ -137,8 +157,8 @@ class MpvProcess(object):
         t.join()
         del self.event_listeners[event_name]
 
-    def observe_property(self, property_name, cb):
-        self.register_event(property_name, cb, True)
+    def observe_property(self, property_name, fn):
+        self.register_event(property_name, fn, True)
 
     def unobserve_property(self, property_name):
         self.unregister_event(property_name, True)
