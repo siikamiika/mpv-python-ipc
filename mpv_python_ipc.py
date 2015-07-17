@@ -152,7 +152,7 @@ class MpvProcess(object):
         self._ipc_command('{}_{}'.format(
                 'unobserveproperty' if unobserve_property else 'unregisterevent',
                 event_name
-            ), custom_id=c_id)
+            ), custom_id=c_id, get_output=False)
         queue.put('unregister')
         t.join()
         del self.event_listeners[event_name]
@@ -163,7 +163,7 @@ class MpvProcess(object):
     def unobserve_property(self, property_name):
         self.unregister_event(property_name, True)
 
-    def _ipc_command(self, command, custom_id=None, keep_queue=False):
+    def _ipc_command(self, command, custom_id=None, keep_queue=False, get_output=True):
         if custom_id == None:
             c_id = self.command_id
             self.command_id += 1
@@ -174,6 +174,8 @@ class MpvProcess(object):
             'script_binding {}\n'.format(
                 '{}_{}'.format(c_id, command)).encode('utf-8'))
         self.process.stdin.flush()
+        if not get_output:
+            return
         try:
             output = self.data_queues[c_id].get(True, 3)
         except Empty:
