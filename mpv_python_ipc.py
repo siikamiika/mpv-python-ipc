@@ -27,12 +27,9 @@ class MpvStdoutLine(object):
             if line.startswith("[ipc]"):
                 line = json.loads(line.lstrip("[ipc]").strip())
                 self.id = line[0]
-                if len(line) == 1:
-                    self.data = None
-                elif len(line) == 2:
-                    self.data = line[1]
-                else:
-                    self.data = line[1:]
+                self.chunks = line[1]
+                self.ord = line[2]
+                self.data = line[3]
                 self.ipc = True
         except: pass
 
@@ -68,16 +65,39 @@ class MpvStdoutParser(object):
         self.fd = fd
         self.queues = queues
         self.debug = debug
+        self.buffer = dict()
 
     def start(self):
         for line in iter(self.fd.readline, b''):
             parsed_line = MpvStdoutLine(line)
-            if parsed_line.ipc and self.queues.get(parsed_line.id):
-                self.queues[parsed_line.id].put(parsed_line.data)
+            if parsed_line.ipc:
+                i = parsed_line.id
+            else:
+                i = None
+            if self.queues.get(i):
+                self.append_to_buffer(parsed_line)
+                if len(self.buffer[i]) == parsed_line.chunks:
+                    self.feed_to_queue(i)
+
             if self.debug:
                 print(line)
         self.fd.close()
 
+    def append_to_buffer(self, line):
+        if not self.buffer.get(line.id):
+            self.buffer[line.id] = []
+        self.buffer[line.id].append(line)
+
+    def feed_to_queue(self, cmd_id):
+        all_data = ''.join(l.data for l in sorted(
+            self.buffer[cmd_id], key=lambda l: l.ord))
+        all_data = json.loads(all_data)
+        if len(all_data) == 0:
+            all_data = None
+        elif len(all_data) == 1:
+            all_data = all_data[0]
+        self.queues[cmd_id].put(all_data)
+        del self.buffer[cmd_id]
 
 class MpvProcess(object):
 

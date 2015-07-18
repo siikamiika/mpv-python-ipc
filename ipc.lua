@@ -25,12 +25,28 @@ function unescape(input)
     return input:gsub("{c(%d+)}", function (charcode) return string.char(tonumber(charcode)) end)
 end
 
+function send_data(data)
+    local id = data[1]
+    table.remove(data, 1)
+    local all = utils.format_json(data)
+    local buflen = 1000
+    local chunks = math.ceil(all:len() / buflen)
+    local Start = 1
+    local End = buflen
+    for i = 1, chunks do
+        local chunk = all:sub(Start, End)
+        local line = utils.format_json({id, chunks, i, chunk})
+        print(line)
+        Start = Start + buflen
+        End = End + buflen
+    end
+end
+
 function get_property(req_id, property, native)
     local gp = mp.get_property
     if native then gp = mp.get_property_native end
     local property = unescape(property)
-    local val = utils.format_json({req_id, gp(property)})
-    print(val)
+    send_data({req_id, gp(property)})
 end
 
 function get_property_native(req_id, property)
@@ -41,40 +57,33 @@ function set_property(req_id, property, value)
     local property = unescape(property)
     local value = utils.parse_json(unescape(value))
     mp.set_property(property, value)
-    local response = utils.format_json({req_id})
-    print(response)
+    send_data({req_id})
 end
 
 function register_event(req_id, event_name)
     registered_events[event_name] = function()
-        local event_notification = utils.format_json({req_id})
-        print(event_notification)
+        send_data({req_id})
     end
     mp.register_event(event_name, registered_events[event_name])
-    response = utils.format_json({req_id})
-    print(response)
+    send_data({req_id})
 end
 
 function unregister_event(req_id, event_name)
     mp.unregister_event(registered_events[event_name])
-    response = utils.format_json({req_id})
-    print(response)
+    send_data({req_id})
 end
 
 function observe_property(req_id, property)
     observed_properties[property] = function(name, value)
-        local event_notification = utils.format_json({req_id, name, value})
-        print(event_notification)
+        send_data({req_id, name, value})
     end
     mp.observe_property(property, "native", observed_properties[property])
-    response = utils.format_json({req_id})
-    print(response)
+    send_data({req_id})
 end
 
 function unobserve_property(req_id, property)
     mp.unobserve_property(observed_properties[property])
-    response = utils.format_json({req_id})
-    print(response)
+    send_data({req_id})
 end
 
 mp.register_event("client-message", function(e)
