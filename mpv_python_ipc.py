@@ -136,6 +136,11 @@ class MpvProcess(object):
         self.process.stdin.write((command + '\n').encode('utf-8'))
         self.process.stdin.flush()
 
+    def commandv(self, args):
+        args = self._escape_script_binding(json.dumps(args))
+        return self._ipc_command('commandv_{}'.format(
+            args))
+
     def get_property(self, prop, native=False):
         prop = self._escape_script_binding(prop)
         return self._ipc_command('getproperty{}_{}'.format(
@@ -152,6 +157,7 @@ class MpvProcess(object):
 
     def register_event(self, event_name, fn, observe_property=False):
         self.unregister_event(event_name, observe_property)
+        event_name = self._escape_script_binding(event_name)
         c_id = self.command_id
         self._ipc_command('{}_{}'.format(
                 'observeproperty' if observe_property else 'registerevent',
@@ -165,6 +171,7 @@ class MpvProcess(object):
         self.event_listeners[event_name] = (t, c_id)
 
     def unregister_event(self, event_name, unobserve_property=False):
+        event_name = self._escape_script_binding(event_name)
         if not self.event_listeners.get(event_name):
             return
         t, c_id = self.event_listeners[event_name]

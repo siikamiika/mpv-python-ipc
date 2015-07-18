@@ -61,6 +61,7 @@ function set_property(req_id, property, value)
 end
 
 function register_event(req_id, event_name)
+    local event_name = unescape(event_name)
     registered_events[event_name] = function()
         send_data({req_id})
     end
@@ -69,11 +70,13 @@ function register_event(req_id, event_name)
 end
 
 function unregister_event(req_id, event_name)
+    local event_name = unescape(event_name)
     mp.unregister_event(registered_events[event_name])
     send_data({req_id})
 end
 
 function observe_property(req_id, property)
+    local property = unescape(property)
     observed_properties[property] = function(name, value)
         send_data({req_id, name, value})
     end
@@ -82,7 +85,14 @@ function observe_property(req_id, property)
 end
 
 function unobserve_property(req_id, property)
+    local property = unescape(property)
     mp.unobserve_property(observed_properties[property])
+    send_data({req_id})
+end
+
+function commandv(req_id, args)
+    local args = utils.parse_json(unescape(args))
+    mp.commandv(unpack(args))
     send_data({req_id})
 end
 
@@ -104,5 +114,7 @@ mp.register_event("client-message", function(e)
         observe_property(msg[1], msg[3])
     elseif msg[2] == 'unobserveproperty' then
         unobserve_property(msg[1], msg[3])
+    elseif msg[2] == 'commandv' then
+        commandv(msg[1], msg[3])
     end
 end)
