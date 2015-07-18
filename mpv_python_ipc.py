@@ -136,7 +136,7 @@ class MpvProcess(object):
         self.process.stdin.write((command + '\n').encode('utf-8'))
         self.process.stdin.flush()
 
-    def commandv(self, args):
+    def commandv(self, *args):
         args = self._escape_script_binding(json.dumps(args))
         return self._ipc_command('commandv_{}'.format(
             args))
