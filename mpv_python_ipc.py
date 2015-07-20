@@ -101,7 +101,7 @@ class MpvStdoutParser(object):
 
 class MpvProcess(object):
 
-    def __init__(self, debug=False):
+    def __init__(self, args=[], debug=False):
         self.debug = debug
         self.process = Popen([mpv_executable,
             '--quiet',
@@ -111,7 +111,7 @@ class MpvProcess(object):
             '--script={}'.format(script_path / 'ipc.lua'),
             '--force-window',
             '--osc=no',
-            '--idle'],
+            '--idle'] + args,
             stdout=PIPE, stdin=PIPE, bufsize=1)
         self.command_id = 0
         self.data_queues = dict()
