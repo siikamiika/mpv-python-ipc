@@ -49,7 +49,7 @@ class MpvEventHandler(object):
                     break
                 if self.observe_property:
                     try:
-                        if event:
+                        if type(event) is list:
                             self.func(*event)
                     except Exception as e:
                         print(e)
