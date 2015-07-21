@@ -27,7 +27,7 @@ class MpvStdoutLine(object):
             line = self.raw_line.decode()
             if line.startswith("[ipc]"):
                 line = json.loads(line.lstrip("[ipc]").strip())
-                if line.get('ready'):
+                if 'ready' in line:
                     self.ready = True
                     return
                 self.id = line[0]
@@ -35,7 +35,7 @@ class MpvStdoutLine(object):
                 self.ord = line[2]
                 self.data = line[3]
                 self.ipc = True
-        except: pass
+        except IndexError: pass
 
 
 class MpvEventHandler(object):
