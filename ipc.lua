@@ -78,7 +78,7 @@ end
 function observe_property(req_id, property)
     local property = unescape(property)
     observed_properties[property] = function(name, value)
-        send_data({req_id, name, value})
+        send_data({req_id, name, value or ""})
     end
     mp.observe_property(property, "native", observed_properties[property])
     send_data({req_id})
