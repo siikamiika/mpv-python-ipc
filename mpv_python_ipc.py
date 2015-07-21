@@ -19,6 +19,7 @@ class MpvStdoutLine(object):
     def __init__(self, raw_line):
         self.raw_line = raw_line
         self.ipc = False
+        self.ready = False
         self.parse_line()
 
     def parse_line(self):
@@ -26,6 +27,9 @@ class MpvStdoutLine(object):
             line = self.raw_line.decode()
             if line.startswith("[ipc]"):
                 line = json.loads(line.lstrip("[ipc]").strip())
+                if line.get('ready'):
+                    self.ready = True
+                    return
                 self.id = line[0]
                 self.chunks = line[1]
                 self.ord = line[2]
@@ -70,6 +74,8 @@ class MpvStdoutParser(object):
     def start(self):
         for line in iter(self.fd.readline, b''):
             parsed_line = MpvStdoutLine(line)
+            if parsed_line.ready:
+                self.queues['ready'].put(True)
             if parsed_line.ipc:
                 i = parsed_line.id
             else:
@@ -103,6 +109,7 @@ class MpvProcess(object):
 
     def __init__(self, args=[], debug=False):
         self.debug = debug
+        self.ready = False
         self.process = Popen([mpv_executable,
             '--quiet',
             '--no-term-osd',
@@ -115,6 +122,7 @@ class MpvProcess(object):
             stdout=PIPE, stdin=PIPE, bufsize=1)
         self.command_id = 0
         self.data_queues = dict()
+        self.data_queues['ready'] = Queue()
         self.event_listeners = dict()
         self._start_parser()
 
@@ -191,6 +199,11 @@ class MpvProcess(object):
         self.unregister_event(property_name, True)
 
     def _ipc_command(self, command, custom_id=None, keep_queue=False, get_output=True):
+        if not self.ready:
+            ready = self.data_queues['ready'].get(True)
+            if not ready:
+                return
+            self.ready = ready
         if custom_id == None:
             c_id = self.command_id
             self.command_id += 1

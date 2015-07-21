@@ -118,3 +118,5 @@ mp.register_event("client-message", function(e)
         commandv(msg[1], msg[3])
     end
 end)
+
+print([[{"ready":true}]])
