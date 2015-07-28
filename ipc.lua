@@ -3,24 +3,6 @@ local utils = require "mp.utils"
 local registered_events = {}
 local observed_properties = {}
 
-function string:split(delim, max_splits)
-    if max_splits == nil or max_splits < 1 then
-        max_splits = 0
-    end
-    local result = {}
-    local pattern = "(.-)"..delim.."()"
-    local splits = 0
-    local last_pos = 1
-    for part, pos in self:gmatch(pattern) do
-        splits = splits + 1
-        result[splits] = part
-        last_pos = pos
-        if splits == max_splits then break end
-    end
-    result[splits + 1] = self:sub(last_pos)
-    return result
-end
-
 function unescape(input)
     return input:gsub("{c(%d+)}", function (charcode) return string.char(tonumber(charcode)) end)
 end
@@ -97,8 +79,7 @@ function commandv(req_id, args)
 end
 
 mp.register_event("client-message", function(e)
-    local msg = e.args[2]
-    msg = msg:split("_")
+    local msg = e.args
     msg[1] = tonumber(msg[1])
     if msg[2] == 'getproperty' then
         get_property(msg[1], msg[3])
