@@ -7,6 +7,7 @@ setup(name='mpv-python-ipc',
     description='Python bindings to mpv lua api',
     author='siikamiika',
     url='https://github.com/siikamiika/mpv-python-ipc',
-    packages=[''],
-    package_data={'': ['ipc.lua']}
+    packages=['mpv-python-ipc'],
+    package_data={'mpv-python-ipc': ['ipc.lua']},
+    package_dir={'mpv-python-ipc': '.'}
 )
