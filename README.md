@@ -13,3 +13,7 @@ from mpv_python_ipc import MpvProcess
 mp = MpvProcess()
 print(mp.get_property("idle"))
 ```
+
+## Note
+
+Named pipe IPC support has been added to mpv master. This project will probably eventually switch to using it and JSON IPC instead of the ugly hack it currently uses.
